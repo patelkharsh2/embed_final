@@ -1,127 +1,466 @@
-/**
- * Copyright (c) 2023 Milk-V
- *
- * SPDX-License-Identifier: BSD-3-Clause
- **/
-
-#include <stdio.h>
-//#include <unistd.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <inttypes.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
 
-#include <wiringx.h>
-
-#include "font.h"
+#include "linux_i2c.h"
 #include "ssd1306.h"
- 
-static int fd_i2c;
+#include "font.h"
 
-void ssd1306_write_byte(unsigned dat,unsigned cmd)
+const char init_oled_type_file[] = "/tmp/.ssd1306_oled_type";
+
+static uint8_t data_buf[1024];
+static uint8_t max_lines = 0;
+static uint8_t max_columns = 0;
+static uint8_t global_x = 0;
+static uint8_t global_y = 0;
+
+uint8_t ssd1306_init(uint8_t i2c_dev)
 {
-	if(cmd)
-	{
-		wiringXI2CWriteReg8(fd_i2c, 0x40, dat);
-	}
-	else
-	{
-		wiringXI2CWriteReg8(fd_i2c, 0x00, dat);
-	}
+    uint8_t rc;
+    rc = _i2c_init(i2c_dev, SSD1306_I2C_ADDR);
+    if (rc > 0)
+        return rc;
+        
+    // test i2c connection
+    uint8_t cmd = SSD1306_COMM_CONTROL_BYTE;
+    uint8_t result = 0;
+    _i2c_write(&cmd, 1);
+    _i2c_read(&result, 1);
+    if (result == 0)
+        return 1;
+    
+    return 0;
 }
 
-void ssd1306_set_position(unsigned char x, unsigned char y) 
+uint8_t ssd1306_end()
 {
- 	ssd1306_write_byte(YLevel+y,OLED_CMD);
-	ssd1306_write_byte(((x&0xf0)>>4)|0x10,OLED_CMD);
-	ssd1306_write_byte((x&0x0f),OLED_CMD); 
-}  
-
-void ssd1306_clear_full_screen(unsigned dat)  
-{ 
-	uint8_t i,n,color;	
-	if(dat)
-	{
-		color = 0xff;
-	}
-	else
-	{
-		color = 0;
-	}
-	for(i=0;i<(PAGE_SIZE/2);i++)  
-	{  
-		ssd1306_write_byte(YLevel+i,OLED_CMD);
-		ssd1306_write_byte(XLevelL,OLED_CMD);
-		ssd1306_write_byte(XLevelH,OLED_CMD);
-		for(n=0;n<WIDTH;n++)
-		{
-			ssd1306_write_byte(color,OLED_DATA); 
-		}
-	}
+    return _i2c_close();
 }
 
-void ssd1306_init(void)
+uint8_t ssd1306_oled_onoff(uint8_t onoff)
 {
-	ssd1306_write_byte(0xAE,OLED_CMD); /*display off*/
-	ssd1306_write_byte(0x00,OLED_CMD); /*set lower column address*/ 
-	ssd1306_write_byte(0x10,OLED_CMD); /*set higher column address*/
-	ssd1306_write_byte(0x00,OLED_CMD); /*set display start line*/ 
-	ssd1306_write_byte(0xB0,OLED_CMD); /*set page address*/ 
-	ssd1306_write_byte(0x81,OLED_CMD); /*contract control*/ 
-	ssd1306_write_byte(0xff,OLED_CMD); /*128*/ 
-	ssd1306_write_byte(0xA1,OLED_CMD); /*set segment remap*/ 
-	ssd1306_write_byte(0xA6,OLED_CMD); /*normal / reverse*/ 
-	ssd1306_write_byte(0xA8,OLED_CMD); /*multiplex ratio*/ 
-	ssd1306_write_byte(0x1F,OLED_CMD); /*duty = 1/32*/ 
-	ssd1306_write_byte(0xC8,OLED_CMD); /*Com scan direction*/ 
-	ssd1306_write_byte(0xD3,OLED_CMD); /*set display offset*/ 
-	ssd1306_write_byte(0x00,OLED_CMD); 
-	ssd1306_write_byte(0xD5,OLED_CMD); /*set osc division*/ 
-	ssd1306_write_byte(0x80,OLED_CMD); 
-	ssd1306_write_byte(0xD9,OLED_CMD); /*set pre-charge period*/ 
-	ssd1306_write_byte(0x1f,OLED_CMD); 
-	ssd1306_write_byte(0xDA,OLED_CMD); /*set COM pins*/ 
-	ssd1306_write_byte(0x00,OLED_CMD); 
-	ssd1306_write_byte(0xdb,OLED_CMD); /*set vcomh*/ 
-	ssd1306_write_byte(0x40,OLED_CMD); 
-	ssd1306_write_byte(0x8d,OLED_CMD); /*set charge pump enable*/ 
-	ssd1306_write_byte(0x14,OLED_CMD);
-	ssd1306_clear_full_screen(0);
-	ssd1306_write_byte(0xAF,OLED_CMD); /*display ON*/ 
-}  
-
-void ssd1306_push_char(uint8_t x,uint8_t y,uint8_t chr,uint8_t sizey)
-{      	
-	uint8_t c=0,sizex=sizey/2;
-	uint16_t i=0,size1;
-	if(sizey==8)size1=6;
-	else size1=(sizey/8+((sizey%8)?1:0))*(sizey/2);
-	c=chr-' ';
-	ssd1306_set_position(x,y);
-	for(i=0;i<size1;i++)
-	{
-		if(i%sizex==0&&sizey!=8) ssd1306_set_position(x,y++);
-		if(sizey==8) ssd1306_write_byte(asc2_0806[c][i],OLED_DATA);
-		else if(sizey==16) ssd1306_write_byte(asc2_1608[c][i],OLED_DATA);
-		else return;
-	}
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    if (onoff == 0)
+        data_buf[1] = SSD1306_COMM_DISPLAY_OFF;
+    else
+        data_buf[1] = SSD1306_COMM_DISPLAY_ON;
+    
+    return _i2c_write(data_buf, 2);
 }
 
-void ssd1306_push_string(uint8_t x,uint8_t y,uint8_t *chr,uint8_t sizey)
+uint8_t ssd1306_oled_horizontal_flip(uint8_t flip)
 {
-	uint8_t j=0;
-	while (chr[j]!='\0')
-	{		
-		ssd1306_push_char(x,y,chr[j++],sizey);
-		if(sizey==8)x+=6;
-		else x+=sizey/2;
-	}
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    if (flip == 0)
+        data_buf[1] = SSD1306_COMM_HORIZ_NORM;
+    else
+        data_buf[1] = SSD1306_COMM_HORIZ_FLIP;
+    
+    return _i2c_write(data_buf, 2);
 }
 
-void ssd1306_i2c_init() 
+uint8_t ssd1306_oled_display_flip(uint8_t flip)
 {
-    if ((fd_i2c = wiringXI2CSetup(I2C_DEV_OLED, IIC_SLAVE_ADDR)) <0) {
-        printf("I2C Setup failed: %i\n", fd_i2c);
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    if (flip == 0)
+        data_buf[1] = SSD1306_COMM_DISP_NORM;
+    else
+        data_buf[1] = SSD1306_COMM_DISP_INVERSE;
+    
+    return _i2c_write(data_buf, 2);
+}
+
+// 128x32 please use value 32
+// 128x64 please use value 64
+uint8_t ssd1306_oled_multiplex(uint8_t row)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_MULTIPLEX;
+    data_buf[2] = row - 1;
+    
+    return _i2c_write(data_buf, 3);
+}
+
+// offset range 0x00~0x3f
+uint8_t ssd1306_oled_vert_shift(uint8_t offset)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_VERT_OFFSET;
+    data_buf[2] = offset;
+    
+    return _i2c_write(data_buf, 3);
+}
+
+// default value for clk is 0x80
+uint8_t ssd1306_oled_set_clock(uint8_t clk)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_CLK_SET;
+    data_buf[2] = clk;
+    
+    return _i2c_write(data_buf, 3);
+}
+
+// default value for precharge is 0xf1
+uint8_t ssd1306_oled_set_precharge(uint8_t precharge)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_PRECHARGE;
+    data_buf[2] = precharge;
+    
+    return _i2c_write(data_buf, 3);
+}
+
+// default value for deselect is 0x40
+uint8_t ssd1306_oled_set_deselect(uint8_t voltage)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_DESELECT_LV;
+    data_buf[2] = voltage;
+    
+    return _i2c_write(data_buf, 3);
+}
+
+// default value for com pin is 0x02
+uint8_t ssd1306_oled_set_com_pin(uint8_t value)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_COM_PIN;
+    data_buf[2] = value;
+    
+    return _i2c_write(data_buf, 3);
+}
+
+// default value use SSD1306_PAGE_MODE
+uint8_t ssd1306_oled_set_mem_mode(uint8_t mode)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_MEMORY_MODE;
+    data_buf[2] = mode;
+    
+    return _i2c_write(data_buf, 3);
+}
+
+uint8_t ssd1306_oled_set_col(uint8_t start, uint8_t end)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_SET_COL_ADDR;
+    data_buf[2] = start;
+    data_buf[3] = end;
+    
+    return _i2c_write(data_buf, 4);
+}
+
+uint8_t ssd1306_oled_set_page(uint8_t start, uint8_t end)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_SET_PAGE_ADDR;
+    data_buf[2] = start;
+    data_buf[3] = end;
+    
+    return _i2c_write(data_buf, 4);
+}
+
+// default contrast value is 0x7f
+uint8_t ssd1306_oled_set_constrast(uint8_t value)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_CONTRAST;
+    data_buf[2] = value;
+    
+    return _i2c_write(data_buf, 3);
+}
+
+uint8_t ssd1306_oled_scroll_onoff(uint8_t onoff)
+{
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    if (onoff == 0)
+        data_buf[1] = SSD1306_COMM_DISABLE_SCROLL;
+    else
+        data_buf[1] = SSD1306_COMM_ENABLE_SCROLL;
+    
+    return _i2c_write(data_buf, 2);
+}
+
+uint8_t ssd1306_oled_set_X(uint8_t x)
+{
+    if (x >= max_columns)
+        return 1;
+
+    global_x = x;
+    
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_LOW_COLUMN | (x & 0x0f);
+    data_buf[2] = SSD1306_COMM_HIGH_COLUMN | ((x >> 4) & 0x0f);
+    
+    return _i2c_write(data_buf, 3);
+}
+
+uint8_t ssd1306_oled_set_Y(uint8_t y)
+{
+    if (y >= (max_lines / 8))
+        return 1;
+
+    global_y = y;
+    
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_PAGE_NUMBER | (y & 0x0f);
+
+    return _i2c_write(data_buf, 2);
+}
+
+uint8_t ssd1306_oled_set_XY(uint8_t x, uint8_t y)
+{
+    if (x >= max_columns || y >= (max_lines / 8))
+        return 1;
+
+    global_x = x;
+    global_y = y;
+    
+    data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+    data_buf[1] = SSD1306_COMM_PAGE_NUMBER | (y & 0x0f);
+
+    data_buf[2] = SSD1306_COMM_LOW_COLUMN | (x & 0x0f);
+    
+    data_buf[3] = SSD1306_COMM_HIGH_COLUMN | ((x >> 4) & 0x0f);
+    
+    return _i2c_write(data_buf, 4);
+}
+
+uint8_t ssd1306_oled_set_rotate(uint8_t degree)
+{
+    // only degree 0 and 180
+    if (degree == 0)
+    {
+        data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+        data_buf[1] = SSD1306_COMM_HORIZ_FLIP;
+        data_buf[2] = SSD1306_COMM_SCAN_REVS;
+    
+        return _i2c_write(data_buf, 3);
     }
+    else if (degree == 180)
+    {
+        data_buf[0] = SSD1306_COMM_CONTROL_BYTE;
+        data_buf[1] = SSD1306_COMM_HORIZ_NORM;
+        data_buf[2] = SSD1306_COMM_SCAN_NORM;
+    
+        return _i2c_write(data_buf, 3);
+    }
+    else
+        return 1;
+}
 
-    ssd1306_init();
-    ssd1306_clear_full_screen(0);
-	
+uint8_t ssd1306_oled_default_config(uint8_t oled_lines, uint8_t oled_columns)
+{
+    if (oled_lines != SSD1306_128_64_LINES && oled_lines != SSD1306_128_32_LINES && SSD1306_64_48_LINES)
+        oled_lines = SSD1306_128_64_LINES;
+        
+    if (oled_columns != SSD1306_128_64_COLUMNS && oled_lines != SSD1306_128_32_COLUMNS && SSD1306_64_48_COLUMNS)
+        oled_columns = SSD1306_128_64_COLUMNS;
+        
+    max_lines = oled_lines;
+    max_columns = oled_columns;
+    global_x = 0;
+    global_y = 0;
+    
+    if (ssd1306_oled_save_resolution(max_columns, max_lines) != 0)
+        return 1;
+    
+    uint16_t i = 0;
+    data_buf[i++] = SSD1306_COMM_CONTROL_BYTE;  //command control byte
+    data_buf[i++] = SSD1306_COMM_DISPLAY_OFF;   //display off
+    data_buf[i++] = SSD1306_COMM_DISP_NORM;     //Set Normal Display (default)
+    data_buf[i++] = SSD1306_COMM_CLK_SET;       //SETDISPLAYCLOCKDIV
+    data_buf[i++] = 0x80;                       // the suggested ratio 0x80
+    data_buf[i++] = SSD1306_COMM_MULTIPLEX;     //SSD1306_SETMULTIPLEX
+    data_buf[i++] = oled_lines - 1;             // height is 32 or 64 (always -1)
+    data_buf[i++] = SSD1306_COMM_VERT_OFFSET;   //SETDISPLAYOFFSET
+    data_buf[i++] = 0;                          //no offset
+    data_buf[i++] = SSD1306_COMM_START_LINE;    //SETSTARTLINE
+    data_buf[i++] = SSD1306_COMM_CHARGE_PUMP;   //CHARGEPUMP
+    data_buf[i++] = 0x14;                       //turn on charge pump
+    data_buf[i++] = SSD1306_COMM_MEMORY_MODE;   //MEMORYMODE
+    data_buf[i++] = SSD1306_PAGE_MODE;          // page mode
+    data_buf[i++] = SSD1306_COMM_HORIZ_NORM;    //SEGREMAP  Mirror screen horizontally (A0)
+    data_buf[i++] = SSD1306_COMM_SCAN_NORM;     //COMSCANDEC Rotate screen vertically (C0)
+    data_buf[i++] = SSD1306_COMM_COM_PIN;       //HARDWARE PIN 
+    if (oled_lines == 32)
+        data_buf[i++] = 0x02;                       // for 32 lines
+    else
+        data_buf[i++] = 0x12;                       // for 64 lines or 48 lines
+    data_buf[i++] = SSD1306_COMM_CONTRAST;      //SETCONTRAST
+    data_buf[i++] = 0x7f;                       // default contract value
+    data_buf[i++] = SSD1306_COMM_PRECHARGE;     //SETPRECHARGE
+    data_buf[i++] = 0xf1;                       // default precharge value
+    data_buf[i++] = SSD1306_COMM_DESELECT_LV;   //SETVCOMDETECT                
+    data_buf[i++] = 0x40;                       // default deselect value
+    data_buf[i++] = SSD1306_COMM_RESUME_RAM;    //DISPLAYALLON_RESUME
+    data_buf[i++] = SSD1306_COMM_DISP_NORM;     //NORMALDISPLAY
+    data_buf[i++] = SSD1306_COMM_DISPLAY_ON;    //DISPLAY ON             
+    data_buf[i++] = SSD1306_COMM_DISABLE_SCROLL;//Stop scroll
+    
+    return _i2c_write(data_buf, i);
+}
+
+uint8_t ssd1306_oled_write_line(uint8_t size, char* ptr)
+{
+    uint16_t i = 0;
+    uint16_t index = 0;
+    uint8_t* font_table = 0;
+    uint8_t font_table_width = 0;
+    
+    if (ptr == 0)
+        return 1;
+    
+    if (size == SSD1306_FONT_SMALL) // 5x7
+    {
+        font_table = (uint8_t*)font5x7;
+        font_table_width = 5;
+    }
+    else if (size == SSD1306_FONT_NORMAL) // 8x8
+    {
+        font_table = (uint8_t*)font8x8;
+        font_table_width = 8;
+    }
+    else
+        return 1;
+    
+    data_buf[i++] = SSD1306_DATA_CONTROL_BYTE;
+    
+    // font table range in ascii table is from 0x20(space) to 0x7e(~)
+    while (ptr[index] != 0 && i <= 1024)
+    {
+        if ((ptr[index] < ' ') || (ptr[index] > '~'))
+            return 1;
+
+        uint8_t* font_ptr = &font_table[(ptr[index] - 0x20) * font_table_width];
+        uint8_t j = 0;
+        for (j = 0; j < font_table_width; j++)
+        {
+            data_buf[i++] = font_ptr[j];
+            if (i > 1024)
+                return 1;
+        }
+        // insert 1 col space for small font size)
+        if (size == SSD1306_FONT_SMALL)
+            data_buf[i++] = 0x00;
+        index++;
+    }
+    
+    return _i2c_write(data_buf, i);
+}
+
+uint8_t ssd1306_oled_write_string(uint8_t size, char* ptr)
+{
+    uint8_t rc = 0;
+    
+    if (ptr == 0)
+        return 1;
+    
+    char* line = 0;
+    char* cr = 0;
+    char buf[20];
+    
+    line = ptr;
+    do {
+        memset(buf, 0, 20);
+        cr = strstr(line, "\\n");
+        if (cr != NULL)
+        {
+            strncpy(buf, line, cr - line);
+        }
+        else
+        {
+            strcpy(buf, line);
+        }
+        
+        // set cursor position
+        ssd1306_oled_set_XY(global_x, global_y);
+        rc += ssd1306_oled_write_line(size, buf);
+        
+        if (cr != NULL)
+        {
+            line = &cr[2];
+            global_x = 0;
+            global_y++;
+            if (global_y >= (max_lines / 8))
+                global_y = 0;
+        }
+        else
+            line = NULL;
+                
+    }while (line != NULL);
+    
+    return rc;
+}
+
+uint8_t ssd1306_oled_clear_line(uint8_t row)
+{
+    uint8_t i;
+    if (row >= (max_lines / 8))
+        return 1;
+        
+    ssd1306_oled_set_XY(0, row);
+    data_buf[0] = SSD1306_DATA_CONTROL_BYTE;
+    for (i = 0; i < max_columns; i++)
+        data_buf[i+1] = 0x00;
+        
+    return _i2c_write(data_buf, 1 + max_columns);
+}
+
+uint8_t ssd1306_oled_clear_screen()
+{
+    uint8_t rc = 0;
+    uint8_t i;
+    
+    for (i = 0; i < (max_lines / 8); i++)
+    {
+        rc += ssd1306_oled_clear_line(i);
+    }
+    
+    return rc;
+}
+
+uint8_t ssd1306_oled_save_resolution(uint8_t column, uint8_t row)
+{
+    FILE* fp;
+    
+    fp = fopen(init_oled_type_file, "w");
+    
+    if (fp == NULL)
+    {
+        // file create failed
+        return 1;
+    }
+    
+    fprintf(fp, "%hhux%hhu", column, row);
+    fclose(fp);
+    
+    return 0;
+}
+
+uint8_t ssd1306_oled_load_resolution()
+{
+    FILE* fp;
+    
+    fp = fopen(init_oled_type_file, "r");
+    
+    if (fp == NULL)
+    {
+        // file not exists
+        return 1;
+    }
+    
+    // file exists
+    fscanf(fp, "%hhux%hhu", &max_columns, &max_lines);
+    fclose(fp);
+    
+    return 0;
 }

@@ -1,7 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <mosquitto.h>
 #include <cjson/cJSON.h>
+
+#include <wiringx.h>
+#include "oled_src/ssd1306.h"
+#include "bmp_src/bmp280_i2c.h"
+#include "morse_src/morse.h"
+#include "morse_src/blink.h"
+
+void oled_print()
+{
+    ssd1306_oled_clear_screen();
+    ssd1306_oled_set_XY(0, 0);
+
+}
 
 void message_callback(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message)
 {
@@ -26,19 +40,73 @@ void message_callback(struct mosquitto *mosq, void *userdata, const struct mosqu
             const cJSON *string_msg = cJSON_GetObjectItemCaseSensitive(root, "string_msg");
             if (cJSON_IsString(string_msg))
             {
+                char buff[50];
                 printf("OLED String: %s\n", string_msg->valuestring);
+                sprintf(buff, "String:\\n%s", string_msg->valuestring);
+                oled_print();
+                ssd1306_oled_write_string(0, buff);
             }
 
             const cJSON *int_msg = cJSON_GetObjectItemCaseSensitive(root, "int_msg");
             if (cJSON_IsString(int_msg))
             {
+                char buff[50];
                 printf("OLED Int: %d\n", int_msg->valueint);
+                sprintf(buff, "Number:\\n%s", int_msg->valuestring);
+                oled_print();
+                ssd1306_oled_write_string(0, buff);
+                
             }
 
             const cJSON *task = cJSON_GetObjectItemCaseSensitive(root, "task");
             if (cJSON_IsString(task))
             {
                 printf("Task: %s\n", task->valuestring);
+
+                if(strcmp(task->valuestring, "get_temperature")==0)
+                {
+                    char buff[30];
+                    struct bmp280_i2c result = read_temp_pressure();
+
+                    sprintf(buff, "Temp: %.2fC / %.2fF", result.temperature, result.temp_f);
+                    printf("Temp: %.2fC / %.2fF\n", result.temperature, result.temp_f);
+
+                    oled_print();
+                    ssd1306_oled_write_string(0, buff);
+
+                }
+
+                else if(strcmp(task->valuestring, "get_pressure")==0)
+                {
+                    char buff[30];
+                    struct bmp280_i2c result = read_temp_pressure();
+
+                    printf("Pressure: %.3f kPa\n", result.pressure);
+                    sprintf(buff, "Pressure: %.3f kPa", result.pressure);
+
+                    oled_print();
+                    ssd1306_oled_write_string(0, buff);
+                }
+
+                else if(strcmp(task->valuestring, "get_temperature_pressure")==0)
+                {
+                    char buff[50];
+                    struct bmp280_i2c result = read_temp_pressure();
+
+                    printf("Temperature: %.2f°C/%.2f°F Pressure: %.3fkPa\n", result.temperature, result.temp_f, result.pressure);
+                    sprintf(buff, "Temp: %.2fC/%.2fF \\nPressure: %.3fkPa", result.temperature, result.temp_f, result.pressure);
+
+                    oled_print();
+                    ssd1306_oled_write_string(0, buff);
+
+                }
+
+                else
+                {
+                    printf("Unknown Task...");
+                    ssd1306_oled_clear_screen();
+                    ssd1306_oled_set_XY(0, 0);
+                }
             }
 
             // The above are examples of ways strings and numbers can be sent
@@ -80,6 +148,20 @@ int main(int argc, char *argv[])
     // Initialize the Mosquitto library
     mosquitto_lib_init();
 
+    // Intialize WiringX
+    if(wiringXSetup("duo", NULL) == -1) {
+    wiringXGC();
+    }
+
+    //Intialize BMP280
+    bmp280_i2c_init();
+
+    //Intialize SSD1306
+    ssd1306_init(0);
+    ssd1306_oled_default_config(64, 128);
+    ssd1306_oled_clear_screen();
+    ssd1306_oled_set_XY(0, 0);
+
     // Create a new Mosquitto runtime instance with a random client ID
     mosq = mosquitto_new(NULL, true, NULL);
     if (!mosq)
@@ -92,7 +174,7 @@ int main(int argc, char *argv[])
     mosquitto_message_callback_set(mosq, message_callback);
 
     // Connect to an MQTT brokers
-    
+
     if (mosquitto_connect(mosq, "104.236.198.67", 1883, 60) != MOSQ_ERR_SUCCESS)
     {
         fprintf(stderr, "Could not connect to broker\n");
