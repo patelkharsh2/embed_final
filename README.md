@@ -36,9 +36,17 @@ docker run --rm -v ${PWD}:/app -v ${PWD}/mqtt_src/install_cv1800b_openssl:/app/i
 
 
 ## Local Testing
-### Testing with `publisher.c`
-* Change the ip parameter of `mosquitto_connect` in the main function *subscriber.c* to "localhost" instead of the ip, "104.236.198.67"
-* Change the topic parameter in `mosquitto_subscribe` in main function to "topic/test"
+### Testing with `publisher`
+* Change the ip parameter of `mosquitto_connect` in the main function *subscriber.c* to `localhost` instead of the ip, `104.236.198.67`
+* Change the topic parameter in `mosquitto_subscribe` in main function to `topic/test`
+* Cmake file will compile both `publisher` and `subscriber`. Copy the publisher over with 
+    ```bash
+    scp build/publisher root@192.168.42.1:/root/
+    ```
+### Test with `publisher_instructor`
+* This does local testing but with the topics
+    * Change the ip parameter of `mosquitto_connect` in the main function *subscriber.c* to `localhost` instead of the ip, `104.236.198.67`
+    * Change the topic parameter in `mosquitto_subscribe` in main function to `cpe4953/spring2024/group2`
 
 ## Challenges
 * `get_temperature_pressure` not displaying on OLED
