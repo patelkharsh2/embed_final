@@ -2,19 +2,24 @@
 
 ## Building the Binary
 
-### Pulling Cross-Compile Docker Image
+### Unzip the MQTT libraries
+* Use the python script to unzip the three zip folders in `mqtt_src`
+    ```bash
+    py unzip_libs.py
+    ```
+### Pull the Cross-Compile Docker Image
 ```bash
 docker pull patelkharsh2/duo-sdk:latest
 ```
 
 ### Compile Libraries
 ```bash
-docker run --rm -v ${PWD}:/app -v ${PWD}/install_cv1800b_openssl:/app/install_cv1800b_openssl -v ${PWD}/install_cv1800b_cjson:/app/install_cv1800b_cjson -v ${PWD}/install_cv1800b_mqtt:/app/install_cv1800b_mqtt patelkharsh2/duo-sdk bash -c "mkdir build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/app/milkv_duo.cmake .."
+docker run --rm -v ${PWD}:/app -v ${PWD}/mqtt_src/install_cv1800b_openssl:/app/install_cv1800b_openssl -v ${PWD}/mqtt_src/install_cv1800b_cjson:/app/install_cv1800b_cjson -v ${PWD}/mqtt_src/install_cv1800b_mqtt:/app/install_cv1800b_mqtt patelkharsh2/duo-sdk bash -c "mkdir build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/app/milkv_duo.cmake .."
 ```
 
 ### Build Binary
 ```bash
-docker run --rm -v ${PWD}:/app -v ${PWD}/install_cv1800b_openssl:/app/install_cv1800b_openssl -v ${PWD}/install_cv1800b_cjson:/app/install_cv1800b_cjson -v ${PWD}/install_cv1800b_mqtt:/app/install_cv1800b_mqtt patelkharsh2/duo-sdk bash -c "cd build && make"
+docker run --rm -v ${PWD}:/app -v ${PWD}/mqtt_src/install_cv1800b_openssl:/app/install_cv1800b_openssl -v ${PWD}/mqtt_src/install_cv1800b_cjson:/app/install_cv1800b_cjson -v ${PWD}/mqtt_src/install_cv1800b_mqtt:/app/install_cv1800b_mqtt patelkharsh2/duo-sdk bash -c "cd build && make"
 ```
 
 ## Transfer the Binary to the Duo
@@ -41,5 +46,4 @@ docker run --rm -v ${PWD}:/app -v ${PWD}/install_cv1800b_openssl:/app/install_cv
 * If we had more time, we would implement the morse code functionality
 
 TODO:
-* Create auto unzipper python script
 * Add the updated docker build command to the build.py

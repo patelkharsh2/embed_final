@@ -1,7 +1,7 @@
 install_cv1800b_cjson
 install_cv1800b_openssl
 install_cv1800b_mqtt
-install_cv1800b_cjson.zip
-install_cv1800b_openssl.zip
-install_cv1800b_mqtt.zip
+mqtt_src/install_cv1800b_cjson
+mqtt_src/install_cv1800b_openssl
+mqtt_src/install_cv1800b_mqtt
 build
