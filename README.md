@@ -43,7 +43,11 @@ docker run --rm -v ${PWD}:/app -v ${PWD}/mqtt_src/install_cv1800b_openssl:/app/i
 ## Challenges
 * `get_temperature_pressure` not displaying on OLED
     * String was too long, had to break the line and print on the next one
-* If we had more time, we would implement the morse code functionality
+* Getting the subscriber to work with the grader
+    * Had to change the IP and topic
+* If we had more time, we would implement the morse code functionality and some custom tasking
+
 
 TODO:
 * Add the updated docker build command to the build.py
+* Adding the ability for morse code translation
