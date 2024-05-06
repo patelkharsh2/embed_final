@@ -1,0 +1,7 @@
+install_cv1800b_cjson
+install_cv1800b_openssl
+install_cv1800b_mqtt
+install_cv1800b_cjson.zip
+install_cv1800b_openssl.zip
+install_cv1800b_mqtt.zip
+build

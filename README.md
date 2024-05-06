@@ -1,0 +1,3 @@
+docker run --rm -v ${PWD}:/app -v ${PWD}/install_cv1800b_openssl:/app/install_cv1800b_openssl -v ${PWD}/install_cv1800b_cjson:/app/install_cv1800b_cjson -v ${PWD}/install_cv1800b_mqtt:/app/install_cv1800b_mqtt patelkharsh2/duo-sdk bash -c "mkdir build && cd build && cmake -DCMAKE_TOOLCHAIN_FILE=/app/milkv_duo.cmake .."
+
+docker run --rm -v ${PWD}:/app -v ${PWD}/install_cv1800b_openssl:/app/install_cv1800b_openssl -v ${PWD}/install_cv1800b_cjson:/app/install_cv1800b_cjson -v ${PWD}/install_cv1800b_mqtt:/app/install_cv1800b_mqtt patelkharsh2/duo-sdk bash -c "cd build && make"
