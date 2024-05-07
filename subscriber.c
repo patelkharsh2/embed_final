@@ -48,11 +48,11 @@ void message_callback(struct mosquitto *mosq, void *userdata, const struct mosqu
             }
 
             const cJSON *int_msg = cJSON_GetObjectItemCaseSensitive(root, "int_msg");
-            if (cJSON_IsString(int_msg))
+            if (cJSON_IsNumber(int_msg))
             {
                 char buff[50];
                 printf("OLED Int: %d\n", int_msg->valueint);
-                sprintf(buff, "Number:\\n%s", int_msg->valuestring);
+                sprintf(buff, "Number:\\n%d", int_msg->valueint);
                 oled_print();
                 ssd1306_oled_write_string(0, buff);
                 
@@ -161,6 +161,7 @@ int main(int argc, char *argv[])
     ssd1306_oled_default_config(64, 128);
     ssd1306_oled_clear_screen();
     ssd1306_oled_set_XY(0, 0);
+    ssd1306_oled_set_rotate(0);
 
     // Create a new Mosquitto runtime instance with a random client ID
     mosq = mosquitto_new(NULL, true, NULL);
