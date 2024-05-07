@@ -86,7 +86,6 @@ docker run --rm -v ${PWD}:/app -v ${PWD}/mqtt_src/install_cv1800b_openssl:/app/i
 ![pinout](/hardware/duo-pinout.png)
 
 * Diagram
-<img src="/hardware/setup.jpg" alt="drawing" width="500"/>
     * **Power:** Pin 36
     * **Ground:** Pin 38
     * **SSD1306**
@@ -95,6 +94,10 @@ docker run --rm -v ${PWD}:/app -v ${PWD}/mqtt_src/install_cv1800b_openssl:/app/i
     * **BMP280**
         * SCL: Pin 15
         * SDA: Pin 14
+<br><img src="/hardware/setup.jpg" alt="drawing" width="500"/><br>
+
+
+
 
 ## Challenges
 * `get_temperature_pressure` not displaying on OLED
