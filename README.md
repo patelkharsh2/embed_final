@@ -73,13 +73,13 @@ docker run --rm -v ${PWD}:/app -v ${PWD}/mqtt_src/install_cv1800b_openssl:/app/i
 
 ### Components
 * RJ45 Expansion Module
-    <img src="/hardware/rj45.jpg" alt="drawing" width="200"/>
+    <br><img src="/hardware/rj45.jpg" alt="drawing" width="200"/>
 * Barmometric Pressure Sensor (BMP280)
-    <img src="/hardware/bmp280.jpg" alt="drawing" width="200"/>
+    <br><img src="/hardware/bmp280.jpg" alt="drawing" width="200"/>
 * OLED Display (SSD1306)
-    <img src="/hardware/ssd1306.jpg" alt="drawing" width="200"/>
+    <br><img src="/hardware/ssd1306.jpg" alt="drawing" width="200"/>
 * Milk-V Duo
-    <img src="/hardware/duo-v1.2.png" alt="drawing" width="200"/>
+    <br><img src="/hardware/duo-v1.2.png" alt="drawing" width="200"/>
 
 ### Connection Diagram
 * Duo Pinout
